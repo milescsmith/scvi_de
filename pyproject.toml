@@ -1,0 +1,31 @@
+[project]
+name = "scvi-de"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Miles Smith", email = "mileschristiansmith@gmail.com" }
+]
+dependencies = [
+    "anndata>=0.10.6",
+    "scvi-tools>=1.1.2",
+    "scipy>=1.13.0",
+    "pandas>=2.2.1",
+]
+readme = "README.md"
+requires-python = ">= 3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "ruff>=0.3.5",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scvi_de"]
