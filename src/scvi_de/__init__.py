@@ -6,7 +6,6 @@ import scvi
 from scipy.sparse import csr_matrix
 
 
-
 # TODO: pass more options on
 def scvi_de(
     adata: ad.AnnData,
@@ -17,10 +16,11 @@ def scvi_de(
     batch_key: str = "batch",
     remove_outliers: bool = False,
     # plot: bool = False,
+    inplace: bool = False,
     return_df: bool = False,
-    copy: bool = False,
+    return_model: bool = False,
     lfc_use: Literal["lfc_mean", "lfc_median", "lfc_max", "lfc_min"] = "lfc_mean",
-) -> ad.AnnData | pd.DataFrame:
+) -> dict[str, pd.DataFrame | ad.AnnData | scvi.models.SCVI] | None:
     adata_copy = adata.copy()
 
     scvi.data.poisson_gene_selection(adata_copy)
@@ -73,59 +73,61 @@ def scvi_de(
             for i in adata_copy.obs[groupby].unique()
         }
 
-    if return_df:
-        return de_change
+    names = {
+        i: (de_change[i]["proba_de"] * de_change[i][lfc_use] * de_change[i]["non_zeros_proportion1"])
+        .sort_values(ascending=False)
+        .index.to_list()
+        for i in sorted(de_change)
+    }
 
-    else:
-        # is this the best way to rank the potential genes? who knows.  But I don't have the attention span to
-        # follow how it is done in scanpy.tl.rank_genes_groups
-        names = {
+    scores_rec = pd.DataFrame(
+        {
             i: (de_change[i]["proba_de"] * de_change[i][lfc_use] * de_change[i]["non_zeros_proportion1"])
             .sort_values(ascending=False)
-            .index.to_list()
+            .to_numpy()
             for i in sorted(de_change)
         }
+    ).to_records(index=False)
 
-        scores_rec = pd.DataFrame(
-            {
-                i: (de_change[i]["proba_de"] * de_change[i][lfc_use] * de_change[i]["non_zeros_proportion1"])
-                .sort_values(ascending=False)
-                .to_numpy()
-                for i in sorted(de_change)
-            }
-        ).to_records(index=False)
+    pvals_rec = pd.DataFrame(
+        {i: de_change[i].loc[names[i], "proba_not_de"].to_numpy() for i in sorted(de_change)}
+    ).to_records(index=False)
 
-        pvals_rec = pd.DataFrame(
-            {i: de_change[i].loc[names[i], "proba_not_de"].to_numpy() for i in sorted(de_change)}
-        ).to_records(index=False)
+    lfc_rec = pd.DataFrame(
+        {i: de_change[i].loc[names[i], lfc_use].to_numpy() for i in sorted(de_change)}
+    ).to_records(index=False)
 
-        lfc_rec = pd.DataFrame(
-            {i: de_change[i].loc[names[i], lfc_use].to_numpy() for i in sorted(de_change)}
-        ).to_records(index=False)
+    de_dict = {
+        "params": {
+            "groupby": "leiden_wnn_0.9",
+            "reference": "rest",
+            "method": "scvi_de",
+            "use_raw": True,
+            "layer": None,
+            "lfc_used": lfc_use,
+            "corr_method": "benjamini-hochberg",
+        },
+        "names": pd.DataFrame(names).to_records(index=False),
+        "scores": scores_rec,
+        "pvals": pvals_rec,
+        "pvals_adj": pvals_rec,
+        "logfoldchanges": lfc_rec,
+    }
 
-        de_dict = {
-            "params": {
-                "groupby": "leiden_wnn_0.9",
-                "reference": "rest",
-                "method": "scvi_de",
-                "use_raw": True,
-                "layer": None,
-                "lfc_used": lfc_use,
-                "corr_method": "benjamini-hochberg",
-            },
-            "names": pd.DataFrame(names).to_records(index=False),
-            "scores": scores_rec,
-            "pvals": pvals_rec,
-            "pvals_adj": pvals_rec,
-            "logfoldchanges": lfc_rec,
-        }
+    return_dict = {}
 
-        if copy:
-            adata_copy.uns["rank_genes_groups"] = de_dict
-            return adata_copy
-        else:
-            adata.uns["rank_genes_groups"] = de_dict
-            return None
+    if inplace:
+        adata.uns["rank_genes_groups"] = de_dict
+        return None
+    else:
+        adata_copy.uns["rank_genes_groups"] = de_dict
+        return_dict["adata"] = adata_copy
+        if return_df:
+            return_dict["deg_df"] = de_change
+        if return_model:
+            return_dict["model"] = model
+        return return_dict
+
 
 
 def one_vs_others(
