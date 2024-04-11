@@ -1,0 +1,4 @@
+[tool.towncrier]
+package = "scvi_de"
+package_dir = "src"
+filename = "NEWS.md"

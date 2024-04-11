@@ -130,6 +130,7 @@ numpy==1.26.4
     # via pytorch-lightning
     # via scikit-learn
     # via scipy
+    # via scvi-de
     # via scvi-tools
     # via tensorstore
     # via torchmetrics

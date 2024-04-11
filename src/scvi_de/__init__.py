@@ -20,7 +20,7 @@ def scvi_de(
     return_df: bool = False,
     return_model: bool = False,
     lfc_use: Literal["lfc_mean", "lfc_median", "lfc_max", "lfc_min"] = "lfc_mean",
-) -> dict[str, pd.DataFrame | ad.AnnData | scvi.models.SCVI] | None:
+) -> dict[str, pd.DataFrame | ad.AnnData | scvi.model.SCVI] | None:
     adata_copy = adata.copy()
 
     scvi.data.poisson_gene_selection(adata_copy)
@@ -93,9 +93,9 @@ def scvi_de(
         {i: de_change[i].loc[names[i], "proba_not_de"].to_numpy() for i in sorted(de_change)}
     ).to_records(index=False)
 
-    lfc_rec = pd.DataFrame(
-        {i: de_change[i].loc[names[i], lfc_use].to_numpy() for i in sorted(de_change)}
-    ).to_records(index=False)
+    lfc_rec = pd.DataFrame({i: de_change[i].loc[names[i], lfc_use].to_numpy() for i in sorted(de_change)}).to_records(
+        index=False
+    )
 
     de_dict = {
         "params": {
@@ -114,20 +114,18 @@ def scvi_de(
         "logfoldchanges": lfc_rec,
     }
 
-    return_dict = {}
-
     if inplace:
         adata.uns["rank_genes_groups"] = de_dict
         return None
     else:
         adata_copy.uns["rank_genes_groups"] = de_dict
-        return_dict["adata"] = adata_copy
+        return_dict = {"adata": adata_copy}
+
         if return_df:
             return_dict["deg_df"] = de_change
         if return_model:
             return_dict["model"] = model
         return return_dict
-
 
 
 def one_vs_others(
