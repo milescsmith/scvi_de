@@ -1,0 +1,2 @@
+Added ability to return the model produced and to use a model as input, allowing one to bypass lengthy model creation when changing comparison options
+Allow use of scvi.model.TOTALVI in addition to scvi.model.SCVI
