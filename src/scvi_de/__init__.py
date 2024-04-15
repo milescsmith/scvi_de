@@ -16,7 +16,7 @@ def scvi_de(
     compare_group: str | None = None,
     reference_group: str = "rest",
     batch_correct: bool = False,
-    batch_key: str = "batch",
+    batch_key: str | None = None,
     dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     remove_outliers: bool = False,
@@ -185,7 +185,7 @@ def create_model(
     adata: ad.AnnData,
     layer: str | None = None,
     model_type: Literal["scvi", "totalvi"] = "scvi",  # add more options and we validate input arguments
-    batch_key: str = "str",
+    batch_key: str | None = None,
     inplace: bool = False,
     dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
@@ -201,21 +201,23 @@ def create_model(
 ) -> scvi.model.SCVI:
     adata_copy = adata if inplace else adata.copy()
     if layer:
-        if ((adata_copy.layers[layer] % 0) != 0).any():
+        is_not_int = ((adata_copy.layers[layer].toarray() % 1) != 0).any() if issparse(adata_copy.layers[layer]) else ((adata_copy.layers[layer] % 1) != 0).any()
+        if is_not_int:
             msg = f"The {model_type} model requires raw, non-normalized counts and it looks like the {layer} layer in the passed object are normalized"
             raise ValueError(msg)
-    elif issparse(adata_copy.X):
-        if ((adata_copy.X.toarray() % 0) != 0).any():
+    else:
+        is_not_int = ((adata_copy.X.toarray() % 1) != 0).any() if issparse(adata_copy.X) else ((adata_copy.X % 1) != 0).any()
+        if is_not_int:
             msg = f"The {model_type} model requires raw, non-normalized counts and it looks like the passed object has been normalized"
             raise ValueError(msg)
-    elif ((adata_copy.X % 0) != 0).any():
-        msg = f"The {model_type} model requires raw, non-normalized counts and it looks like the passed object has been normalized"
-        raise ValueError(msg)
 
     scvi.data.poisson_gene_selection(adata_copy, layer=layer)
 
     adata_copy = adata_copy[:, adata_copy.var["highly_variable"]]  # focus on selected genes
 
+    if layer:
+        adata_copy.layers["X"] = adata_copy.X.copy()
+        adata_copy.X = adata.layers[layer].copy()
     adata_copy.layers[save_layer] = csr_matrix(adata_copy.X.copy())  # converts to CSR format, preserve counts
 
     match model_type.lower():
