@@ -4,7 +4,7 @@ from typing import Literal
 import anndata as ad
 import pandas as pd
 import scvi
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, issparse
 
 
 # TODO: pass more options on
@@ -20,7 +20,6 @@ def scvi_de(
     dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     remove_outliers: bool = False,
-    # plot: bool = False,
     inplace: bool = False,
     return_df: bool = False,
     return_model: bool = False,
@@ -204,6 +203,10 @@ def create_model(
     if layer:
         if ((adata_copy.layers[layer] % 0) != 0).any():
             msg = f"The {model_type} model requires raw, non-normalized counts and it looks like the {layer} layer in the passed object are normalized"
+            raise ValueError(msg)
+    elif issparse(adata_copy.X):
+        if ((adata_copy.X.toarray() % 0) != 0).any():
+            msg = f"The {model_type} model requires raw, non-normalized counts and it looks like the passed object has been normalized"
             raise ValueError(msg)
     elif ((adata_copy.X % 0) != 0).any():
         msg = f"The {model_type} model requires raw, non-normalized counts and it looks like the passed object has been normalized"
