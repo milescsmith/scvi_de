@@ -1,3 +1,15 @@
+## [0.4.0](https://github.com/milescsmith/scvi_de/tree/0.4.0) - 2024-04-16
+
+
+### Added
+
+- Added several points where potential errors are check before expensive calculations are performed
+
+### Fixed
+
+- Performing DEG on protein data actually works now.
+
+
 ## [0.3.4](https://github.com/milescsmith/scvi_de/tree/0.3.4) - 2024-04-16
 
 

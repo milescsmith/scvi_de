@@ -18,7 +18,7 @@ def scvi_de(
     reference_group: str = "rest",
     batch_correct: bool = False,
     batch_key: str | None = None,
-    dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
+    dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] | None = None,
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     remove_outliers: bool = False,
     inplace: bool = False,
@@ -43,23 +43,29 @@ def scvi_de(
         Optional. Key for `adata.layers` where raw count data is stored. If not provided, the counts in `adata.X` will
         be used
     modality : Literal["rna", "prot"], default="rna"
-        Optional. Type of data to be processed.  Currently, only "rna" (for RNA-seq) and "prot" (for CITE-seq) are allowed.
+        Type of data to be processed.  Currently, only "rna" (for RNA-seq) and "prot" (for CITE-seq) are allowed.
     compare_group : str
-        Optional. Category in `adata.obs[groupby]` to use as the query for comparison of two groups. Positive fold
+        Category in `adata.obs[groupby]` to use as the query for comparison of two groups. Positive fold
         changes indicate higher expression in this group.
     reference_group : str
-        Optional. Category in `adata.obs[groupby]` to use as a reference for comparison of two groups. Negative
+        Category in `adata.obs[groupby]` to use as a reference for comparison of two groups. Negative
         fold changes indicate higher expression in this group.
     batch_correct : bool, default=False
-        Optional. Should batch effects be corrected for in DE inference?
+        Should batch effects be corrected for in DE inference?
     batch_key : str, default="batch"
-        Optional: Column in `adata.obs` to use to indicate batches.
-    dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"], default="gene"
+        Column in `adata.obs` to use to indicate batches.
+    dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell", "protein", "protein-batch", "protein-label"]
         One of the following:
 
-        * ``'gene'`` - genes_dispersion parameter of NB is constant per gene across cells
-        * ``'gene-batch'`` - genes_dispersion can differ between different batches
-        * ``'gene-label'`` - genes_dispersion can differ between different labels
+        * ``'gene'`` - dispersion parameter of NB is constant per gene across cells
+        * ``'gene-batch'`` - dispersion can differ between different batches
+        * ``'gene-label'`` - dispersion can differ between different labels
+        * ``'gene-cell'`` - dispersion can differ for every gene in every cell
+        * ``'protein'`` - dispersion parameter is constant per protein across cells
+        * ``'protein-batch'`` - dispersion can differ between different batches NOT TESTED
+        * ``'protein-label'`` - dispersion can differ between different labels NOT TESTED
+
+        If not passed, either 'gene' or 'protein' will be selected based on the type of data.
     gene_likelihood : Literal["nb", "zinb", "poisson"], default="nb"
         One of the following:
 
@@ -82,6 +88,16 @@ def scvi_de(
     ------
         dict of {str: pd.DataFrame | ad.AnnData | scvi.model.SCVI | scvi.model.TOTALVI}
     """
+    if dispersion is None:
+        match modality:
+            case "rna":
+                dispersion = "gene"
+            case "prot":
+                dispersion = "protein"
+            case _:
+                msg = "Dispersion was not indicated and cannot be figured out based on the type of data to be analyzed"
+                raise ValueError(msg)
+
     if adata and model:
         msg = (
             "Passing and Anndata object and scVI model is confusing. "
@@ -191,7 +207,9 @@ def create_model(
     modality: Literal["rna", "prot"] = "rna",  # add more options and we validate input arguments
     batch_key: str | None = None,
     inplace: bool = False,
-    dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
+    dispersion: Literal[
+        "gene", "gene-batch", "gene-label", "gene-cell", "protein", "protein-batch", "protein-label"
+    ] = "gene",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     save_layer: str = "counts",
     check_val_every_n_epoch: int = 1,
@@ -203,14 +221,24 @@ def create_model(
     ] = "elbo_validation",
     **kwargs,
 ) -> scvi.model.SCVI:
+    if ((modality == "rna") and ("protein" in dispersion)) or ((modality == "prot") and ("gene" in dispersion)):
+        msg = f"The argument you passed indicate that this is {modality} data, but then you also indicated a {dispersion}. These are incompatible. Please try again."
+        raise ValueError(msg)
+
     adata_copy = adata if inplace else adata.copy()
     if layer:
-        is_not_int = ((adata_copy.layers[layer].toarray() % 1) != 0).any() if issparse(adata_copy.layers[layer]) else ((adata_copy.layers[layer] % 1) != 0).any()
+        is_not_int = (
+            ((adata_copy.layers[layer].toarray() % 1) != 0).any()
+            if issparse(adata_copy.layers[layer])
+            else ((adata_copy.layers[layer] % 1) != 0).any()
+        )
         if is_not_int:
             msg = f"Both the scVI and TOTALVI models require raw, non-normalized counts and it looks like the {layer} layer in the passed object are normalized"
             raise ValueError(msg)
     else:
-        is_not_int = ((adata_copy.X.toarray() % 1) != 0).any() if issparse(adata_copy.X) else ((adata_copy.X % 1) != 0).any()
+        is_not_int = (
+            ((adata_copy.X.toarray() % 1) != 0).any() if issparse(adata_copy.X) else ((adata_copy.X % 1) != 0).any()
+        )
         if is_not_int:
             msg = "the scVI and TOTALVI models require raw, non-normalized counts and it looks like the passed object has been normalized"
             raise ValueError(msg)
@@ -230,16 +258,24 @@ def create_model(
             model = scvi.model.SCVI(adata_copy, dispersion=dispersion, gene_likelihood=gene_likelihood)
         case "prot":
             # assuming that we're working with the protein portion of a MuData object
-            adata_copy.obsm["prot"] = adata_copy.X
-            adata.uns["prot_names"] = adata.var_names.to_list()
+            if issparse(adata_copy.X):
+                adata_copy.obsm["prot"] = adata_copy.X.todense().copy()
+            else:
+                adata_copy.obsm["prot"] = adata_copy.X.copy()
+            adata_copy.uns["prot_names"] = [f"{_}_x" for _ in adata_copy.var_names.to_list()]
             scvi.model.TOTALVI.setup_anndata(
                 adata=adata_copy,
                 layer=save_layer,
                 batch_key=batch_key,
                 protein_expression_obsm_key="prot",
+                # there is currently (2024-04-16) a bug in TotalVI that causes a
+                # "cannot reindex on an axis with duplicate labels" error.
+                # See: https://github.com/scverse/scvi-tools/issues/2627
+                # I, however, think this is because gene expression should stay in adata.X
+                # and prot data should be stuffed in adata.obsm[prot_key]
                 protein_names_uns_key="prot_names",
             )
-            model = scvi.model.TOTALVI(adata_copy, dispersion=dispersion, gene_likelihood=gene_likelihood)
+            model = scvi.model.TOTALVI(adata_copy, protein_dispersion=dispersion, gene_likelihood=gene_likelihood)
 
     model.train(
         check_val_every_n_epoch=check_val_every_n_epoch,
@@ -269,6 +305,19 @@ def one_vs_others(
     else:
         cell_idx2 = adata.obs[groupby] == reference_group
 
-    return model.differential_expression(
-        idx1=cell_idx1, idx2=cell_idx2, batch_correction=batch_correct, filter_outlier_cells=remove_outliers
-    )
+    match type(model):
+        case scvi.model.SCVI:
+            return model.differential_expression(
+                idx1=cell_idx1, idx2=cell_idx2, batch_correction=batch_correct, filter_outlier_cells=remove_outliers
+            )
+        case scvi.model.TOTALVI:
+            # need to change this when/if we add support for mudata objects.  It appears that TotalVI expects that
+            # adata.X has gene expression while adata.obsm[protein_key] has the protein expression
+            # if we do it correctly instead of how we're doing it here, we can get protein/gene correlations
+            deg_df = model.differential_expression(idx1=cell_idx1, idx2=cell_idx2, batch_correction=batch_correct)
+            deg_df = deg_df[deg_df.index.str.endswith("x")]
+            deg_df.index = deg_df.index.str.replace("_x", "")
+            return deg_df
+        case _:
+            msg = "Model is of an unrecognized type.  Currently only scVI and TotalVI models work."
+            raise ValueError(msg)
