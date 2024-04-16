@@ -1,1 +1,0 @@
-Fixed how the layer/X and scVI work (no more tensors full of nan).

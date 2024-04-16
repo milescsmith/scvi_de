@@ -1,3 +1,11 @@
+## [0.3.3](https://github.com/milescsmith/scvi_de/tree/0.3.3) - 2024-04-16
+
+
+### Fixed
+
+- Fixed how the layer/X and scVI work (no more tensors full of nan).
+
+
 ## [0.3.2](https://github.com/milescsmith/scvi_de/tree/0.3.2) - 2024-04-15
 
 ### Fixed

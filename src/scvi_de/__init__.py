@@ -217,7 +217,7 @@ def create_model(
 
     if layer:
         adata_copy.layers["X"] = adata_copy.X.copy()
-        adata_copy.X = adata.layers[layer].copy()
+        adata_copy.X = adata_copy.layers[layer].copy()
     adata_copy.layers[save_layer] = csr_matrix(adata_copy.X.copy())  # converts to CSR format, preserve counts
 
     match model_type.lower():
