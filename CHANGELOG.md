@@ -1,3 +1,11 @@
+## [0.3.4](https://github.com/milescsmith/scvi_de/tree/0.3.4) - 2024-04-16
+
+
+### Fixed
+
+- Actually pass the type of data from scvi_de to create_model.
+
+
 ## [0.3.3](https://github.com/milescsmith/scvi_de/tree/0.3.3) - 2024-04-16
 
 

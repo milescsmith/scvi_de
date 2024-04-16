@@ -13,6 +13,7 @@ def scvi_de(
     model: scvi.model.SCVI | scvi.model.TOTALVI | None = None,
     groupby: str = "leiden",
     layer: str | None = None,
+    modality: Literal["rna", "prot"] = "rna",
     compare_group: str | None = None,
     reference_group: str = "rest",
     batch_correct: bool = False,
@@ -41,6 +42,8 @@ def scvi_de(
     layer : str
         Optional. Key for `adata.layers` where raw count data is stored. If not provided, the counts in `adata.X` will
         be used
+    modality : Literal["rna", "prot"], default="rna"
+        Optional. Type of data to be processed.  Currently, only "rna" (for RNA-seq) and "prot" (for CITE-seq) are allowed.
     compare_group : str
         Optional. Category in `adata.obs[groupby]` to use as the query for comparison of two groups. Positive fold
         changes indicate higher expression in this group.
@@ -94,6 +97,7 @@ def scvi_de(
             inplace=inplace,
             dispersion=dispersion,
             gene_likelihood=gene_likelihood,
+            modality=modality,
             **kwargs,
         )
     else:
@@ -184,7 +188,7 @@ def scvi_de(
 def create_model(
     adata: ad.AnnData,
     layer: str | None = None,
-    model_type: Literal["scvi", "totalvi"] = "scvi",  # add more options and we validate input arguments
+    modality: Literal["rna", "prot"] = "rna",  # add more options and we validate input arguments
     batch_key: str | None = None,
     inplace: bool = False,
     dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
@@ -203,12 +207,12 @@ def create_model(
     if layer:
         is_not_int = ((adata_copy.layers[layer].toarray() % 1) != 0).any() if issparse(adata_copy.layers[layer]) else ((adata_copy.layers[layer] % 1) != 0).any()
         if is_not_int:
-            msg = f"The {model_type} model requires raw, non-normalized counts and it looks like the {layer} layer in the passed object are normalized"
+            msg = f"Both the scVI and TOTALVI models require raw, non-normalized counts and it looks like the {layer} layer in the passed object are normalized"
             raise ValueError(msg)
     else:
         is_not_int = ((adata_copy.X.toarray() % 1) != 0).any() if issparse(adata_copy.X) else ((adata_copy.X % 1) != 0).any()
         if is_not_int:
-            msg = f"The {model_type} model requires raw, non-normalized counts and it looks like the passed object has been normalized"
+            msg = "the scVI and TOTALVI models require raw, non-normalized counts and it looks like the passed object has been normalized"
             raise ValueError(msg)
 
     scvi.data.poisson_gene_selection(adata_copy, layer=layer)
@@ -220,11 +224,11 @@ def create_model(
         adata_copy.X = adata_copy.layers[layer].copy()
     adata_copy.layers[save_layer] = csr_matrix(adata_copy.X.copy())  # converts to CSR format, preserve counts
 
-    match model_type.lower():
-        case "scvi":
+    match modality.lower():
+        case "rna":
             scvi.model.SCVI.setup_anndata(adata_copy, layer=layer, batch_key=batch_key)
             model = scvi.model.SCVI(adata_copy, dispersion=dispersion, gene_likelihood=gene_likelihood)
-        case "totalvi":
+        case "prot":
             # assuming that we're working with the protein portion of a MuData object
             adata_copy.obsm["prot"] = adata_copy.X
             adata.uns["prot_names"] = adata.var_names.to_list()
