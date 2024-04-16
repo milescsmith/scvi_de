@@ -1,3 +1,11 @@
+## [0.4.1](https://github.com/milescsmith/scvi_de/tree/0.4.1) - 2024-04-16
+
+
+### Changed
+
+- Changed the default values for return_model and return_df to True
+
+
 ## [0.4.0](https://github.com/milescsmith/scvi_de/tree/0.4.0) - 2024-04-16
 
 

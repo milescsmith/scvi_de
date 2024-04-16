@@ -22,8 +22,8 @@ def scvi_de(
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     remove_outliers: bool = False,
     inplace: bool = False,
-    return_df: bool = False,
-    return_model: bool = False,
+    return_df: bool = True,
+    return_model: bool = True,
     lfc_use: Literal["lfc_mean", "lfc_median", "lfc_max", "lfc_min"] = "lfc_mean",
     **kwargs,
 ) -> dict[str, pd.DataFrame | ad.AnnData | scvi.model.SCVI | scvi.model.TOTALVI] | None:
@@ -77,9 +77,9 @@ def scvi_de(
         Whether to filter outlier cells with `:meth:~scvi.model.base.DifferentialComputation.filter_outlier_cells()`
     inplace : bool, default=False
         Should any changes be performed directly on the provided AnnData object. If not, a copy is made.
-    return_df : bool, default=False
+    return_df : bool, default=True
         Should a dataframe of results be returned?
-    return_model : bool, default=False
+    return_model : bool, default=True
         Should the model be returned?
     lfc_use : Literal["lfc_mean", "lfc_median", "lfc_max", "lfc_min"], default="lfc_mean"
         Which log fold change to use.
@@ -300,6 +300,7 @@ def one_vs_others(
 ):
     cell_idx1 = adata.obs[groupby] == current_group
 
+    # honestly, if we are doing one vs rest comparisons, we need to change this to 
     if reference_group == "rest":
         cell_idx2 = adata.obs[groupby] != current_group
     else:
