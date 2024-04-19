@@ -1,3 +1,16 @@
+## [0.5.0](https://github.com/milescsmith/scvi_de/tree/0.4.1) - 2024-04-19
+
+### Changed
+
+- Make sure that the dispersion argument to scvi_de is valid
+
+### Fixed
+
+- Did you know that `scipy.sparse.csr_matrix.todense()` and `scipy.sparse.csr_matrix.toarray()`
+produce different outputs? Yes? Well apparently I'm an idiot that doesn't notice what he is typing.
+Fixed the issue with raw counts being unusable in a layer instead of X because a np.matrix isn't capable of blah blah.
+
+
 ## [0.4.1](https://github.com/milescsmith/scvi_de/tree/0.4.1) - 2024-04-16
 
 

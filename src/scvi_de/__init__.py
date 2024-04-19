@@ -18,7 +18,7 @@ def scvi_de(
     reference_group: str = "rest",
     batch_correct: bool = False,
     batch_key: str | None = None,
-    dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] | None = None,
+    dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell", "protein", "protein-batch", "protein-label"] | None = None,
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     remove_outliers: bool = False,
     inplace: bool = False,
@@ -97,7 +97,10 @@ def scvi_de(
             case _:
                 msg = "Dispersion was not indicated and cannot be figured out based on the type of data to be analyzed"
                 raise ValueError(msg)
-
+    if dispersion not in ("gene", "gene-batch", "gene-label", "gene-cell", "protein", "protein-batch", "protein-label"):
+        msg = f"{dispersion} is not a valid option for dispersion"
+        raise ValueError(msg)
+        
     if adata and model:
         msg = (
             "Passing and Anndata object and scVI model is confusing. "
@@ -259,7 +262,7 @@ def create_model(
         case "prot":
             # assuming that we're working with the protein portion of a MuData object
             if issparse(adata_copy.X):
-                adata_copy.obsm["prot"] = adata_copy.X.todense().copy()
+                adata_copy.obsm["prot"] = adata_copy.X.toarray().copy()
             else:
                 adata_copy.obsm["prot"] = adata_copy.X.copy()
             adata_copy.uns["prot_names"] = [f"{_}_x" for _ in adata_copy.var_names.to_list()]
