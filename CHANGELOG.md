@@ -1,4 +1,28 @@
-## [0.5.0](https://github.com/milescsmith/scvi_de/tree/0.4.1) - 2024-04-19
+## [0.6.0](https://github.com/milescsmith/scvi_de/tree/0.6.0) - 2024-04-26
+
+### Added
+
+- Now works with MuData objects
+- A logging submodule, though not using it much at the moment
+
+### Changed
+
+- More properly handle using joint RNA and protein data with TotalVI.
+- Changed how differential expression testing works, now using the built-in ability of
+    scvi.model.MODEL.differential_expression to test multiple groups. This will probably
+    futz with adjusted p_values
+- Switch from using rye as as package manager to pdm
+- if adata.X is not an integer array, scvi_de now looks to see if adata.raw.X is and copies that
+    over if it is
+- Remove towncrier
+
+### Refactored
+
+- Split functions up and changed a LOT of when and how things are tested
+
+NOTE: parameter documentation and typing is now a mess
+
+## [0.5.0](https://github.com/milescsmith/scvi_de/tree/0.5.0) - 2024-04-19
 
 ### Changed
 

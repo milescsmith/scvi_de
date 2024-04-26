@@ -1,33 +1,37 @@
 [project]
-name = "scvi-de"
-version = "0.5.0"
-description = "Add your description here"
+name = "scvi_de"
+version = "0.6.0"
+description = "Default template for PDM package"
 authors = [
-    { name = "Miles Smith", email = "mileschristiansmith@gmail.com" }
+    {name = "Miles Smith", email = "miles-smith@omrf.org"},
 ]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "GPL-3.0"}
 dependencies = [
     "anndata>=0.10.6",
     "scvi-tools>=1.1.2",
     "scipy>=1.13.0",
     "pandas>=2.1.1",
     "numpy>=1.26.4",
-]
-readme = "README.md"
-requires-python = ">= 3.10"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.rye]
-managed = true
-dev-dependencies = [
-    "ruff>=0.3.5",
-    "towncrier>=23.11.0",
+    "mudata>=0.2.3",
+    "loguru>=0.7.2",
+    "muon>=0.1.6",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4.2",
+]
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/scvi_de"]
+
+[tool.pdm]
+distribution = false
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
