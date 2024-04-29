@@ -1,6 +1,6 @@
 [project]
 name = "scvi_de"
-version = "0.6.0"
+version = "0.7.0"
 description = "Default template for PDM package"
 authors = [
     {name = "Miles Smith", email = "miles-smith@omrf.org"},

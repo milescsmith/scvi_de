@@ -1,3 +1,26 @@
+## [0.7.0](https://github.com/milescsmith/scvi_de/tree/0.7.0) - 2024-04-29
+
+### Added
+
+- Ability to control for background proteins (i.e. isotype controls) in CITE-seq data.
+    - Note: I'm not entirely sure I'm doing it correctly - copying the counts to obs, then telling TotalVI to use those
+    as continuous covariates
+
+### Changed
+
+- DEG results are now filtered to make sure they match what is actually present in the anndata object
+- Refactored `process_deg_results`
+
+### Fixed
+
+- Reusing a model no longer tries to reprocess the not-passed anndata/mudata object
+- Results are correctly written to `rank_genes_groups` for each modality
+
+
+### Unchanged
+
+- Documentation remains a mess
+
 ## [0.6.0](https://github.com/milescsmith/scvi_de/tree/0.6.0) - 2024-04-26
 
 ### Added
