@@ -37,18 +37,8 @@ def scvi_de(
     reference_group: str | None = None,
     batch_correct: bool = False,
     batch_key: str | None = None,
-    dispersion: (
-        Literal[
-            "gene",
-            "gene-batch",
-            "gene-label",
-            "gene-cell",
-            "protein",
-            "protein-batch",
-            "protein-label",
-        ]
-        | None
-    ) = None,
+    gene_dispersion: Literal["gene","gene-batch","gene-label","gene-cell"] = "gene",
+    protein_dispersion: Literal["protein","protein-batch","protein-label"] = "protein",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     remove_outliers: bool = False,
     return_df: bool = True,
@@ -126,15 +116,6 @@ def scvi_de(
         dict of {str: pd.DataFrame | scvi.model.SCVI | scvi.model.TOTALVI}
         Original object is modified in place, with results placed in adata.uns["rank_genes_groups"]
     """
-    if dispersion is None:
-        match modality:
-            case "rna":
-                dispersion = "gene"
-            case "prot":
-                dispersion = "protein"
-            case _:
-                msg = "Dispersion was not indicated and cannot be figured out based on the type of data to be analyzed"
-                raise ValueError(msg)
 
     # several check to make sure we don't waste a lot of time on something that will later fail
     logger.debug("performing checks")
@@ -147,7 +128,8 @@ def scvi_de(
         modality,
         mudata_protein_modality,
         mudata_rna_modality,
-        dispersion,
+        gene_dispersion,
+        protein_dispersion
     )
 
     # scvi sometimes takes MuData objects, sometimes not.  I don't think TotalVI does, so we need to reform the data
@@ -169,7 +151,8 @@ def scvi_de(
             adata=tmp,
             layers=layers,
             batch_key=batch_key,
-            dispersion=dispersion,
+            gene_dispersion=gene_dispersion,
+            protein_dispersion=protein_dispersion,
             gene_likelihood=gene_likelihood,
             modality=modality,
             protein_obsm_key=protein_obsm_key,
@@ -228,16 +211,9 @@ def perform_checks(
     modality,
     mudata_protein_modality,
     mudata_rna_modality,
-    dispersion,
+    gene_dispersion,
+    protein_dispersion,
 ):
-    # Do we have a mismatch of modality and dispersion options?
-    if ((modality == "rna") and ("protein" in dispersion)) or ((modality == "prot") and ("gene" in dispersion)):
-        msg = (
-            f"The argument you passed indicate that this is {modality} data, but then you also indicated a "
-            f"{dispersion}. These are incompatible. Please try again."
-        )
-        raise ValueError(msg)
-
     if save_model_path and (save_model_path.exists() and not overwrite_previous_model):
         msg = (
             f"It appears that a folder exists at {save_model_path}, but `overwrite_previous_model` is `False`. "
@@ -267,18 +243,22 @@ def perform_checks(
         )
         warnings.warn(msg, UserWarning, stacklevel=2)
 
-    if dispersion not in (
+    if gene_dispersion not in (
         "gene",
         "gene-batch",
         "gene-label",
         "gene-cell",
+    ):
+        msg = f"{gene_dispersion} is not a valid option for gene_dispersion"
+        raise ValueError(msg)
+
+    if protein_dispersion not in (
         "protein",
         "protein-batch",
         "protein-label",
     ):
-        msg = f"{dispersion} is not a valid option for dispersion"
+        msg = f"{protein_dispersion} is not a valid option for protein_dispersion"
         raise ValueError(msg)
-
     if adata and model:
         msg = (
             "When both an Anndata/MuData object and scVI model are passed to scvi_de, the existing model is used for "
@@ -374,15 +354,17 @@ def create_model(
     batch_key: str | None = None,
     protein_obsm_key: str | None = None,
     protein_names_uns_key: str | None = None,
-    dispersion: Literal[
+    gene_dispersion: Literal[
         "gene",
         "gene-batch",
         "gene-label",
         "gene-cell",
+    ] = "gene", 
+    protein_dispersion: Literal[
         "protein",
         "protein-batch",
         "protein-label",
-    ] = "gene",
+    ] = "protein",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     save_layer: str = "counts",
     check_val_every_n_epoch: int = 1,
@@ -426,7 +408,7 @@ def create_model(
     match modality.lower():
         case "rna":
             scvi.model.SCVI.setup_anndata(adata_copy, layer=layers, batch_key=batch_key)
-            model = scvi.model.SCVI(adata_copy, dispersion=dispersion, gene_likelihood=gene_likelihood)
+            model = scvi.model.SCVI(adata_copy, dispersion=gene_dispersion, gene_likelihood=gene_likelihood)
         case "prot":
             # Two ways to set things up:
             # if an AnnData object, we need data in adata.obsm[protein_obsm_key]
@@ -471,7 +453,8 @@ def create_model(
                 )
             model = scvi.model.TOTALVI(
                 adata_copy,
-                protein_dispersion=dispersion,
+                protein_dispersion=protein_dispersion,
+                gene_dispersion=gene_dispersion,
                 gene_likelihood=gene_likelihood,
             )
 
@@ -482,7 +465,7 @@ def create_model(
         early_stopping_patience=early_stopping_patience,
         early_stopping_monitor=early_stopping_monitor,
         devices=num_devices,
-        **kwargs,
+        #**kwargs,
     )
 
     return model

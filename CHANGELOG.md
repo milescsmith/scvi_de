@@ -1,3 +1,9 @@
+## [0.8.0](https://github.com/milescsmith/scvi_de/tree/0.8.0) - 2024-04-29
+
+### Changed
+
+- Now we use `gene-dispersion` and `protein-dispersion` in the correct places (esp different for TOTALVI)
+
 ## [0.7.0](https://github.com/milescsmith/scvi_de/tree/0.7.0) - 2024-04-29
 
 ### Added
