@@ -1,3 +1,18 @@
+## [0.9.0] - 2024-07-31
+
+### Added
+
+- pre-commit, nox, mypy, coverage
+
+### Changed
+
+- Removed remnants of `rye`
+- Removed `towncrier`
+
+### Fixed
+
+- Use `sparse` to convert `scipy.sparse.csr_matrix` objects to `sparse.COO` before check if they are all integers
+
 ## [0.8.0](https://github.com/milescsmith/scvi_de/tree/0.8.0) - 2024-04-29
 
 ### Changed

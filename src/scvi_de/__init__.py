@@ -3,9 +3,11 @@ from pathlib import Path
 from typing import Literal
 
 import muon as mu
+import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import scvi
+import sparse
 from anndata import AnnData
 from loguru import logger
 from mudata import MuData
@@ -37,8 +39,8 @@ def scvi_de(
     reference_group: str | None = None,
     batch_correct: bool = False,
     batch_key: str | None = None,
-    gene_dispersion: Literal["gene","gene-batch","gene-label","gene-cell"] = "gene",
-    protein_dispersion: Literal["protein","protein-batch","protein-label"] = "protein",
+    gene_dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
+    protein_dispersion: Literal["protein", "protein-batch", "protein-label"] = "protein",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
     remove_outliers: bool = False,
     return_df: bool = True,
@@ -129,7 +131,7 @@ def scvi_de(
         mudata_protein_modality,
         mudata_rna_modality,
         gene_dispersion,
-        protein_dispersion
+        protein_dispersion,
     )
 
     # scvi sometimes takes MuData objects, sometimes not.  I don't think TotalVI does, so we need to reform the data
@@ -155,15 +157,13 @@ def scvi_de(
             protein_dispersion=protein_dispersion,
             gene_likelihood=gene_likelihood,
             modality=modality,
-            protein_obsm_key=protein_obsm_key,
-            protein_names_uns_key=protein_names_uns_key,
-            num_devices=num_devices,
+            # num_devices=num_devices,
             use_isotype_controls=use_isotype_controls,
             isotype_pattern=isotype_pattern,
             **kwargs,
         )
     elif (adata is None) and (model is None):
-        msg = "Either an AnnData or scVI model needed and both are missing."
+        msg = "Either an AnnData/MuData object or a scVI/TotalVI model are needed and both are missing."
         raise ValueError(msg)
 
     if save_model_path:
@@ -185,8 +185,11 @@ def scvi_de(
 
     if isinstance(model.adata, AnnData):
         model.adata.uns["rank_genes_groups"] = process_deg_results(
-            df=de_change, groupby=groupby, layer=layers, lfc_use=lfc_use,
-            )
+            df=de_change,
+            groupby=groupby,
+            layer=layers,
+            lfc_use=lfc_use,
+        )
     elif isinstance(model.adata, MuData):
         for _ in model.adata.mod:
             if isinstance(de_change, dict):
@@ -276,10 +279,10 @@ def perform_checks(
 
 
 def process_deg_results(
-    df: pd.DataFrame, 
-    groupby:str, 
-    layer: str | None = None, 
-    lfc_use: Literal["lfc_mean", "lfc_median", "lfc_std", "lfc_min", "lfc_max"] = "lfc_mean"
+    df: pd.DataFrame,
+    groupby: str,
+    layer: str | None = None,
+    lfc_use: Literal["lfc_mean", "lfc_median", "lfc_std", "lfc_min", "lfc_max"] = "lfc_mean",
 ):
     """
     Reformat the dataframe(s) returned by `scvi.model.MODEL.differential_expression()` to a form matching
@@ -297,33 +300,45 @@ def process_deg_results(
     ------
     Same as that returned by `scanpy.tl.rank_genes_groups()`
     """
-    names_rec = pd.DataFrame({
-        i: (df[df['group1'] == i]["proba_de"] * df[df['group1'] == i]["lfc_mean"] * df[df['group1'] == i]["non_zeros_proportion1"])
+    names_rec = pd.DataFrame(
+        {
+            i: (
+                df[df["group1"] == i]["proba_de"]
+                * df[df["group1"] == i]["lfc_mean"]
+                * df[df["group1"] == i]["non_zeros_proportion1"]
+            )
             .sort_values(ascending=False)
             .index.to_list()
-        for i in sorted(df['group1'].unique())
-    }).to_records(index=False)
+            for i in sorted(df["group1"].unique())
+        }
+    ).to_records(index=False)
 
-    scores_rec = pd.DataFrame({
-        i: (df[df['group1'] == i]["proba_de"] * df[df['group1'] == i]["lfc_mean"] * df[df['group1'] == i]["non_zeros_proportion1"])
+    scores_rec = pd.DataFrame(
+        {
+            i: (
+                df[df["group1"] == i]["proba_de"]
+                * df[df["group1"] == i]["lfc_mean"]
+                * df[df["group1"] == i]["non_zeros_proportion1"]
+            )
             .sort_values(ascending=False)
             .to_list()
-        for i in sorted(df['group1'].unique())
-    }).to_records(index=False)
+            for i in sorted(df["group1"].unique())
+        }
+    ).to_records(index=False)
 
-    pvals_rec = pd.DataFrame({
-        i: df[df['group1'] == i]["proba_not_de"]
-            .sort_values(ascending=False)
-            .to_list()
-        for i in sorted(df['group1'].unique())
-    }).to_records(index=False)
+    pvals_rec = pd.DataFrame(
+        {
+            i: df[df["group1"] == i]["proba_not_de"].sort_values(ascending=False).to_list()
+            for i in sorted(df["group1"].unique())
+        }
+    ).to_records(index=False)
 
-    logfoldchanges_rec = pd.DataFrame({
-        i: df[df['group1'] == i]["lfc_mean"]
-            .sort_values(ascending=False)
-            .to_list()
-        for i in sorted(df['group1'].unique())
-    }).to_records(index=False)
+    logfoldchanges_rec = pd.DataFrame(
+        {
+            i: df[df["group1"] == i]["lfc_mean"].sort_values(ascending=False).to_list()
+            for i in sorted(df["group1"].unique())
+        }
+    ).to_records(index=False)
 
     return {
         "params": {
@@ -359,7 +374,7 @@ def create_model(
         "gene-batch",
         "gene-label",
         "gene-cell",
-    ] = "gene", 
+    ] = "gene",
     protein_dispersion: Literal[
         "protein",
         "protein-batch",
@@ -387,12 +402,16 @@ def create_model(
         adata_copy = adata_copy[:, adata_copy.var["highly_variable"]]
     elif isinstance(adata_copy, MuData):
         if "rna" in adata_copy.mod:
-            scvi.data.poisson_gene_selection(adata_copy[mudata_rna_modality], layer=layers)
+            scvi.data.poisson_gene_selection(adata_copy[mudata_rna_modality], layer=layers[mudata_rna_modality])
             mu.pp.filter_var(adata_copy[mudata_rna_modality], var="highly_variable")
 
             # TODO: add columns for the isotype controls so that we can regress them out
-            for _ in adata_copy[mudata_protein_modality].var_names[adata_copy[mudata_protein_modality].var_names.str.contains(isotype_pattern)]:
-                adata_copy.obs[_] = adata_copy[mudata_protein_modality].X[:,adata_copy[mudata_protein_modality].var_names.get_loc(_)]
+            for _ in adata_copy[mudata_protein_modality].var_names[
+                adata_copy[mudata_protein_modality].var_names.str.contains(isotype_pattern)
+            ]:
+                adata_copy.obs[_] = adata_copy[mudata_protein_modality].X[
+                    :, adata_copy[mudata_protein_modality].var_names.get_loc(_)
+                ]
 
     if layers and isinstance(adata_copy, AnnData):
         adata_copy.layers["X"] = adata_copy.X.copy()
@@ -439,9 +458,13 @@ def create_model(
                 else:
                     protein_layer = None
                     rna_layer = None
-                isotype_keys = adata_copy[mudata_protein_modality].var_names[
-                    adata_copy[mudata_protein_modality].var_names.str.contains(isotype_pattern)
-                    ] if use_isotype_controls else None
+                isotype_keys = (
+                    adata_copy[mudata_protein_modality].var_names[
+                        adata_copy[mudata_protein_modality].var_names.str.contains(isotype_pattern)
+                    ]
+                    if use_isotype_controls
+                    else None
+                )
 
                 scvi.model.TOTALVI.setup_mudata(
                     mdata=adata_copy,
@@ -465,7 +488,7 @@ def create_model(
         early_stopping_patience=early_stopping_patience,
         early_stopping_monitor=early_stopping_monitor,
         devices=num_devices,
-        #**kwargs,
+        # **kwargs,
     )
 
     return model
@@ -487,6 +510,7 @@ def process_anndata(adata, layers) -> AnnData:
         )
         raise ValueError(msg)
     return adata
+
 
 def process_mudata(
     mudata: MuData,
@@ -513,6 +537,7 @@ def process_mudata(
                 raise ValueError(msg)
 
     return mudata
+
 
 def diff_expr_test(
     adata: AnnData | MuData,
@@ -543,21 +568,20 @@ def diff_expr_test(
             msg = "Model is of an unrecognized type.  Currently only scVI and TotalVI models work."
             raise ValueError(msg)
 
-
     # does this even make sense since we rewrote to use the scvi-native 1 vs many?
     # if "group1" not in deg_df.columns or deg_df["group1"].nunique() <= 1:
     #     return deg_df
     if isinstance(adata, AnnData):
-        return deg_df.loc[deg_df.index.intersection[adata.var_names],:]
+        return deg_df.loc[deg_df.index.intersection[adata.var_names], :]
     elif isinstance(adata, MuData):
         degs_dict = {i: deg_df.loc[deg_df.index.intersection(adata[i].var_names), :] for i in adata.mod}
     for _ in degs_dict:
-        degs_dict[_] = degs_dict[_].loc[degs_dict[_].index.intersection(adata[_].var_names),:]
+        degs_dict[_] = degs_dict[_].loc[degs_dict[_].index.intersection(adata[_].var_names), :]
     return degs_dict
 
 
 def is_integer_array(arr: npt.ArrayLike | csr_matrix) -> bool:
-    if isinstance(arr, csr_matrix):
-        return not ((arr.toarray() % 1) != 0).any()
+    if issparse(arr):
+        return not (np.mod(sparse.asCOO(arr), 1) != 0).any()
     else:
-        return not ((arr % 1) != 0).any()
+        return not (np.mod(arr, 1) != 0).any()
