@@ -1215,19 +1215,16 @@ files = [
 
 [[package]]
 name = "mudata"
-version = "0.2.4"
-requires_python = ">=3.9"
-summary = "Multimodal omics analysis framework"
+version = "0.3.0"
+requires_python = ">=3.10"
+summary = "Multimodal data"
 groups = ["default"]
 dependencies = [
     "anndata>=0.10.8",
-    "h5py",
-    "numpy",
-    "pandas",
 ]
 files = [
-    {file = "mudata-0.2.4-py3-none-any.whl", hash = "sha256:d4dd670d1470dbdb2a2c9d49df82862ee01e58ed01fa8184d495ce5b01aafef7"},
-    {file = "mudata-0.2.4.tar.gz", hash = "sha256:85a34a43778667f227acf1d924fff38baee40d2e99cb5cd5355a0901ded9154a"},
+    {file = "mudata-0.3.0-py3-none-any.whl", hash = "sha256:035a1bbf94ee40308d12aae6f13fcba9a9b43d71786045d7f1437967a28d7514"},
+    {file = "mudata-0.3.0.tar.gz", hash = "sha256:57acfd7648337840b3dc3d12a561b5364cef24fe79d5f4b539b916a7c0e029a7"},
 ]
 
 [[package]]

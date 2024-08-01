@@ -1,4 +1,5 @@
 import warnings
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Literal
 
@@ -17,15 +18,20 @@ from scvi_de.logging import init_logger
 
 init_logger(verbose=3)
 
+try:
+    __version__ = version(__name__)
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "unknown"
+
 
 # TODO: add logging
 # TODO: pass more options on
 # TODO: add an option to save the model IMMEDIATELY after creation
 # TODO: FUCKING HELL WRITE SOME UNIT TESTS!
-def scvi_de(
+def calc_defs(
     adata: AnnData | MuData | None = None,
     model: scvi.model.SCVI | scvi.model.TOTALVI | None = None,
-    save_model_path: Path | None = None,
+    save_model_path: Path | str | None = None,
     overwrite_previous_model: bool = False,
     protein_obsm_key: str = "prot",
     protein_names_uns_key: str = "prot_names",
@@ -121,6 +127,9 @@ def scvi_de(
 
     # several check to make sure we don't waste a lot of time on something that will later fail
     logger.debug("performing checks")
+    if isinstance(save_model_path, str):
+        save_model_path = Path(save_model_path)
+
     perform_checks(
         adata,
         model,
@@ -169,36 +178,37 @@ def scvi_de(
     if save_model_path:
         model.save(save_model_path, overwrite=overwrite_previous_model, save_anndata=True)
 
-    de_change = diff_expr_test(
-        adata=model.adata,
-        model=model,
-        groupby=groupby,
-        current_group=compare_group,
-        reference_group=reference_group,
-        batch_correct=batch_correct,
-        remove_outliers=remove_outliers,
-    )
+    return_dict = {}
+
+    if return_df:
+        de_change = diff_expr_test(
+            adata=model.adata,
+            model=model,
+            groupby=groupby,
+            current_group=compare_group,
+            reference_group=reference_group,
+            batch_correct=batch_correct,
+            remove_outliers=remove_outliers,
+        )
+
+        if isinstance(model.adata, AnnData):
+            model.adata.uns["rank_genes_groups"] = process_deg_results(
+                df=de_change,
+                groupby=groupby,
+                layer=layers,
+                lfc_use=lfc_use,
+            )
+        elif isinstance(model.adata, MuData):
+            for _ in model.adata.mod:
+                if isinstance(de_change, dict):
+                    model.adata[_].uns["rank_genes_groups"] = process_deg_results(
+                        df=de_change[_], groupby=groupby, layer=layers[_] if layers else None, lfc_use=lfc_use
+                    )
+
+        return_dict["deg_df"] = de_change
 
     model.adata.obsm["X_scVI"] = model.get_latent_representation()
 
-    return_dict = {}
-
-    if isinstance(model.adata, AnnData):
-        model.adata.uns["rank_genes_groups"] = process_deg_results(
-            df=de_change,
-            groupby=groupby,
-            layer=layers,
-            lfc_use=lfc_use,
-        )
-    elif isinstance(model.adata, MuData):
-        for _ in model.adata.mod:
-            if isinstance(de_change, dict):
-                model.adata[_].uns["rank_genes_groups"] = process_deg_results(
-                    df=de_change[_], groupby=groupby, layer=layers[_] if layers else None, lfc_use=lfc_use
-                )
-
-    if return_df:
-        return_dict["deg_df"] = de_change
     if return_model:
         return_dict["model"] = model
 
@@ -399,7 +409,7 @@ def create_model(
     # identify the HVGs and subset on those
     if isinstance(adata_copy, AnnData):
         scvi.data.poisson_gene_selection(adata_copy, layer=layers)
-        adata_copy = adata_copy[:, adata_copy.var["highly_variable"]]
+        mu.pp.filter_var(adata_copy, var="highly_variable")
     elif isinstance(adata_copy, MuData):
         if "rna" in adata_copy.mod:
             scvi.data.poisson_gene_selection(adata_copy[mudata_rna_modality], layer=layers[mudata_rna_modality])
@@ -572,7 +582,7 @@ def diff_expr_test(
     # if "group1" not in deg_df.columns or deg_df["group1"].nunique() <= 1:
     #     return deg_df
     if isinstance(adata, AnnData):
-        return deg_df.loc[deg_df.index.intersection[adata.var_names], :]
+        return deg_df.loc[deg_df.index.intersection(adata.var_names), :]
     elif isinstance(adata, MuData):
         degs_dict = {i: deg_df.loc[deg_df.index.intersection(adata[i].var_names), :] for i in adata.mod}
     for _ in degs_dict:
