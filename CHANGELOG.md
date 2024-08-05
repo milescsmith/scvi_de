@@ -1,3 +1,21 @@
+## [0.10.0] - 2024-08-01
+
+### Changed
+
+- renamed the main function from `scvi_de` to `calc_defs`
+- only run `diff_expr_test` in `calc_defs` if `return_df` is True
+- handle `save_model_path` being passed to `calc_defs` as a string
+- use `muon.pp.filter_var` to subset the anndata object in `create_model` instead of trying 
+    to subset the object, avoiding problems with "is it or isn't it a view?"
+
+### Fixed
+
+- use `pd.Series.intersection` in `diff_expr_test` as a function instead of trying to 
+    subset it... since it is a function.
+- Convert the anndata.X from a `scipy.sparse.csr_matrix` to a `sparse.COO` in `is_integer_array`
+    so we can perform math on it, since csr_matrices don't (did they ever?)
+    
+
 ## [0.9.0] - 2024-07-31
 
 ### Added

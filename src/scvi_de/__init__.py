@@ -1,6 +1,7 @@
 import warnings
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import muon as mu
 import numpy as np
@@ -17,15 +18,20 @@ from scvi_de.logging import init_logger
 
 init_logger(verbose=3)
 
+try:
+    __version__ = version(__name__)
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "unknown"
+
 
 # TODO: add logging
 # TODO: pass more options on
 # TODO: add an option to save the model IMMEDIATELY after creation
 # TODO: FUCKING HELL WRITE SOME UNIT TESTS!
-def scvi_de(
+def calc_defs(
     adata: AnnData | MuData | None = None,
     model: scvi.model.SCVI | scvi.model.TOTALVI | None = None,
-    save_model_path: Path | None = None,
+    save_model_path: Path | str | None = None,
     overwrite_previous_model: bool = False,
     protein_obsm_key: str = "prot",
     protein_names_uns_key: str = "prot_names",
@@ -121,6 +127,9 @@ def scvi_de(
 
     # several check to make sure we don't waste a lot of time on something that will later fail
     logger.debug("performing checks")
+    if isinstance(save_model_path, str):
+        save_model_path = Path(save_model_path)
+
     perform_checks(
         adata,
         model,
@@ -169,36 +178,37 @@ def scvi_de(
     if save_model_path:
         model.save(save_model_path, overwrite=overwrite_previous_model, save_anndata=True)
 
-    de_change = diff_expr_test(
-        adata=model.adata,
-        model=model,
-        groupby=groupby,
-        current_group=compare_group,
-        reference_group=reference_group,
-        batch_correct=batch_correct,
-        remove_outliers=remove_outliers,
-    )
+    return_dict = {}
+
+    if return_df:
+        de_change = diff_expr_test(
+            adata=model.adata,
+            model=model,
+            groupby=groupby,
+            current_group=compare_group,
+            reference_group=reference_group,
+            batch_correct=batch_correct,
+            remove_outliers=remove_outliers,
+        )
+
+        if isinstance(model.adata, AnnData):
+            model.adata.uns["rank_genes_groups"] = process_deg_results(
+                df=de_change,
+                groupby=groupby,
+                layer=layers,
+                lfc_use=lfc_use,
+            )
+        elif isinstance(model.adata, MuData):
+            for _ in model.adata.mod:
+                if isinstance(de_change, dict):
+                    model.adata[_].uns["rank_genes_groups"] = process_deg_results(
+                        df=de_change[_], groupby=groupby, layer=layers[_] if layers else None, lfc_use=lfc_use
+                    )
+
+        return_dict["deg_df"] = de_change
 
     model.adata.obsm["X_scVI"] = model.get_latent_representation()
 
-    return_dict = {}
-
-    if isinstance(model.adata, AnnData):
-        model.adata.uns["rank_genes_groups"] = process_deg_results(
-            df=de_change,
-            groupby=groupby,
-            layer=layers,
-            lfc_use=lfc_use,
-        )
-    elif isinstance(model.adata, MuData):
-        for _ in model.adata.mod:
-            if isinstance(de_change, dict):
-                model.adata[_].uns["rank_genes_groups"] = process_deg_results(
-                    df=de_change[_], groupby=groupby, layer=layers[_] if layers else None, lfc_use=lfc_use
-                )
-
-    if return_df:
-        return_dict["deg_df"] = de_change
     if return_model:
         return_dict["model"] = model
 
@@ -206,16 +216,16 @@ def scvi_de(
 
 
 def perform_checks(
-    adata,
-    model,
-    save_model_path,
-    overwrite_previous_model,
-    protein_obsm_key,
-    modality,
-    mudata_protein_modality,
-    mudata_rna_modality,
-    gene_dispersion,
-    protein_dispersion,
+    adata: AnnData | MuData,
+    model: scvi.model.SCVI | scvi.model.TOTALVI,
+    save_model_path: Path | None = None,
+    overwrite_previous_model: bool = False,
+    protein_obsm_key: str | None = None,
+    modality: Literal["rna", "prot"] = "rna",
+    mudata_protein_modality: str = "prot",
+    mudata_rna_modality: str = "rna",
+    gene_dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
+    protein_dispersion: Literal["protein", "protein-batch", "protein-label"] = "protein",
 ):
     if save_model_path and (save_model_path.exists() and not overwrite_previous_model):
         msg = (
@@ -381,6 +391,9 @@ def create_model(
         "protein-label",
     ] = "protein",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
+    size_factor_key: str | list[str] | None = None,
+    categorical_covariate_keys: str | list[str] | None = None,
+    continuous_covariate_keys: str | list[str] | None = None,
     save_layer: str = "counts",
     check_val_every_n_epoch: int = 1,
     max_epochs: int = 400,
@@ -399,7 +412,7 @@ def create_model(
     # identify the HVGs and subset on those
     if isinstance(adata_copy, AnnData):
         scvi.data.poisson_gene_selection(adata_copy, layer=layers)
-        adata_copy = adata_copy[:, adata_copy.var["highly_variable"]]
+        mu.pp.filter_var(adata_copy, var="highly_variable")
     elif isinstance(adata_copy, MuData):
         if "rna" in adata_copy.mod:
             scvi.data.poisson_gene_selection(adata_copy[mudata_rna_modality], layer=layers[mudata_rna_modality])
@@ -426,7 +439,7 @@ def create_model(
     # If we are working with RNA data, use scVI; for protein, use TotalVI
     match modality.lower():
         case "rna":
-            scvi.model.SCVI.setup_anndata(adata_copy, layer=layers, batch_key=batch_key)
+            scvi.model.SCVI.setup_anndata(adata_copy, layer=layers, batch_key=batch_key, size_factor_key=size_factor_key, categorical_covariate_keys=categorical_covariate_keys, continuous_covariate_keys=continuous_covariate_keys)
             model = scvi.model.SCVI(adata_copy, dispersion=gene_dispersion, gene_likelihood=gene_likelihood)
         case "prot":
             # Two ways to set things up:
@@ -449,6 +462,7 @@ def create_model(
                     # I, however, think this is because gene expression should stay in adata.X
                     # and prot data should be stuffed in adata.obsm[prot_key]
                     protein_names_uns_key=protein_names_uns_key,
+                    size_factor_key=size_factor_key, categorical_covariate_keys=categorical_covariate_keys, continuous_covariate_keys=continuous_covariate_keys
                 )
             # things are much simpler if we have a MuData object
             elif isinstance(adata, MuData):
@@ -465,14 +479,17 @@ def create_model(
                     if use_isotype_controls
                     else None
                 )
-
+                if continuous_covariate_keys is None:
+                    continuous_covariate_keys = []
                 scvi.model.TOTALVI.setup_mudata(
                     mdata=adata_copy,
                     batch_key=batch_key,
                     rna_layer=rna_layer,
                     protein_layer=protein_layer,
-                    continuous_covariate_keys=isotype_keys,
+                    continuous_covariate_keys=isotype_keys + continuous_covariate_keys,
                     modalities={"rna_layer": mudata_rna_modality, "protein_layer": mudata_protein_modality},
+                    size_factor_key=size_factor_key,
+                    categorical_covariate_keys=categorical_covariate_keys,
                 )
             model = scvi.model.TOTALVI(
                 adata_copy,
@@ -494,7 +511,7 @@ def create_model(
     return model
 
 
-def process_anndata(adata, layers) -> AnnData:
+def process_anndata(adata: AnnData, layers: str | list[str]) -> AnnData:
     if layers:
         for _ in layers:
             if not is_integer_array(adata.layers[_]):
@@ -547,6 +564,7 @@ def diff_expr_test(
     reference_group: str | None = None,
     batch_correct: bool = False,
     remove_outliers: bool = False,
+    **kwargs: Any,
 ) -> pd.DataFrame | dict[str, pd.DataFrame]:
     match type(model):
         case scvi.model.SCVI:
@@ -556,13 +574,14 @@ def diff_expr_test(
                 group2=reference_group,
                 batch_correction=batch_correct,
                 filter_outlier_cells=remove_outliers,
+                **kwargs
             )
         case scvi.model.TOTALVI:
             # need to change this when/if we add support for mudata objects.  It appears that TotalVI expects that
             # adata.X has gene expression while adata.obsm[protein_key] has the protein expression
             # if we do it correctly instead of how we're doing it here, we can get protein/gene correlations
             deg_df = model.differential_expression(
-                groupby=groupby, group1=current_group, group2=reference_group, batch_correction=batch_correct
+                groupby=groupby, group1=current_group, group2=reference_group, batch_correction=batch_correct, **kwargs
             )
         case _:
             msg = "Model is of an unrecognized type.  Currently only scVI and TotalVI models work."
@@ -572,7 +591,7 @@ def diff_expr_test(
     # if "group1" not in deg_df.columns or deg_df["group1"].nunique() <= 1:
     #     return deg_df
     if isinstance(adata, AnnData):
-        return deg_df.loc[deg_df.index.intersection[adata.var_names], :]
+        return deg_df.loc[deg_df.index.intersection(adata.var_names), :]
     elif isinstance(adata, MuData):
         degs_dict = {i: deg_df.loc[deg_df.index.intersection(adata[i].var_names), :] for i in adata.mod}
     for _ in degs_dict:
@@ -581,7 +600,12 @@ def diff_expr_test(
 
 
 def is_integer_array(arr: npt.ArrayLike | csr_matrix) -> bool:
+    """
+    Test if an array is really all integers
+    """
     if issparse(arr):
+        # have to convert to `sparse.COO` here as `scipy.csr_matrix` either no longer or never did support numpy
+        # calculations on it
         return not (np.mod(sparse.asCOO(arr), 1) != 0).any()
     else:
         return not (np.mod(arr, 1) != 0).any()
