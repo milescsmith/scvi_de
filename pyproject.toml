@@ -36,6 +36,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-random-order>=1.1.1",
     "pytest-xdist>=3.6.1",
+    "pre-commit>=3.8.0",
 ]
 
 [tool.hatch.metadata]

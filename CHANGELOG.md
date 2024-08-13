@@ -1,3 +1,13 @@
+## [0.11.0] - 2024-08-13
+
+## Fixed
+
+- Added `categorical_covariate_keys` and `continuous_covariate_keys` to `calc_defs()` so that the covariate keys 
+    actually get passed on
+    - Also added tests to `perform_checks` to make sure or warn about missing or inappropriate keys
+- Fixed a bug in `process_anndata` where passing the name of a single layer as `str` instead of a `list[str]` threw an
+    error
+
 ## [0.10.0] - 2024-08-01
 
 ### Changed

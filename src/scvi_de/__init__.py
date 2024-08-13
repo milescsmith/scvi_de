@@ -45,6 +45,8 @@ def calc_defs(
     reference_group: str | None = None,
     batch_correct: bool = False,
     batch_key: str | None = None,
+    categorical_covariate_keys: str | list[str] | None = None,
+    continuous_covariate_keys: str | list[str] | None = None,
     gene_dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
     protein_dispersion: Literal["protein", "protein-batch", "protein-label"] = "protein",
     gene_likelihood: Literal["nb", "zinb", "poisson"] = "nb",
@@ -141,6 +143,8 @@ def calc_defs(
         mudata_rna_modality,
         gene_dispersion,
         protein_dispersion,
+        categorical_covariate_keys,
+        continuous_covariate_keys,
     )
 
     # scvi sometimes takes MuData objects, sometimes not.  I don't think TotalVI does, so we need to reform the data
@@ -169,6 +173,8 @@ def calc_defs(
             # num_devices=num_devices,
             use_isotype_controls=use_isotype_controls,
             isotype_pattern=isotype_pattern,
+            categorical_covariate_keys=categorical_covariate_keys,
+            continuous_covariate_keys=continuous_covariate_keys,
             **kwargs,
         )
     elif (adata is None) and (model is None):
@@ -226,6 +232,8 @@ def perform_checks(
     mudata_rna_modality: str = "rna",
     gene_dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
     protein_dispersion: Literal["protein", "protein-batch", "protein-label"] = "protein",
+    categorical_covariate_keys: str | list[str] | None = None,
+    continuous_covariate_keys: str | list[str] | None = None,
 ):
     if save_model_path and (save_model_path.exists() and not overwrite_previous_model):
         msg = (
@@ -286,6 +294,28 @@ def perform_checks(
             "or the MuData equivalent."
         )
         warnings.warn(msg, UserWarning, stacklevel=2)
+    if categorical_covariate_keys and adata:
+        if not_found := [_ for _ in categorical_covariate_keys if _ not in adata.obs.columns]:
+            msg = f"{not_found.join(', ')} were passed as covariate keys, but they are not present in the obs columns."
+            raise ValueError(msg)
+        elif non_category := [
+            _ for _ in categorical_covariate_keys if not pd.api.types.is_categorical_dtype(adata.obs[_])
+        ]:
+            msg = (
+                f"{non_category.join(', ')} were passed as categorical covariate keys, but their data type is not "
+                "categorical"
+            )
+            warnings.warn(msg, UserWarning, stacklevel=2)
+    if continuous_covariate_keys and adata:
+        if not_found := [_ for _ in continuous_covariate_keys if _ not in adata.obs.columns]:
+            msg = f"{not_found.join(', ')} were passed as covariate keys, but they are not present in the obs columns."
+            raise ValueError(msg)
+        elif non_numeric := [_ for _ in categorical_covariate_keys if not pd.api.types.is_numeric_dtype(adata.obs[_])]:
+            msg = (
+                f"{non_numeric.join(', ')} were passed as categorical covariate keys, but their data type is not "
+                "categorical"
+            )
+            warnings.warn(msg, UserWarning, stacklevel=2)
 
 
 def process_deg_results(
@@ -439,7 +469,14 @@ def create_model(
     # If we are working with RNA data, use scVI; for protein, use TotalVI
     match modality.lower():
         case "rna":
-            scvi.model.SCVI.setup_anndata(adata_copy, layer=layers, batch_key=batch_key, size_factor_key=size_factor_key, categorical_covariate_keys=categorical_covariate_keys, continuous_covariate_keys=continuous_covariate_keys)
+            scvi.model.SCVI.setup_anndata(
+                adata_copy,
+                layer=layers,
+                batch_key=batch_key,
+                size_factor_key=size_factor_key,
+                categorical_covariate_keys=categorical_covariate_keys,
+                continuous_covariate_keys=continuous_covariate_keys,
+            )
             model = scvi.model.SCVI(adata_copy, dispersion=gene_dispersion, gene_likelihood=gene_likelihood)
         case "prot":
             # Two ways to set things up:
@@ -462,7 +499,9 @@ def create_model(
                     # I, however, think this is because gene expression should stay in adata.X
                     # and prot data should be stuffed in adata.obsm[prot_key]
                     protein_names_uns_key=protein_names_uns_key,
-                    size_factor_key=size_factor_key, categorical_covariate_keys=categorical_covariate_keys, continuous_covariate_keys=continuous_covariate_keys
+                    size_factor_key=size_factor_key,
+                    categorical_covariate_keys=categorical_covariate_keys,
+                    continuous_covariate_keys=continuous_covariate_keys,
                 )
             # things are much simpler if we have a MuData object
             elif isinstance(adata, MuData):
@@ -513,6 +552,7 @@ def create_model(
 
 def process_anndata(adata: AnnData, layers: str | list[str]) -> AnnData:
     if layers:
+        layers = [layers] if isinstance(layers, str) else layers
         for _ in layers:
             if not is_integer_array(adata.layers[_]):
                 msg = (
@@ -574,7 +614,7 @@ def diff_expr_test(
                 group2=reference_group,
                 batch_correction=batch_correct,
                 filter_outlier_cells=remove_outliers,
-                **kwargs
+                **kwargs,
             )
         case scvi.model.TOTALVI:
             # need to change this when/if we add support for mudata objects.  It appears that TotalVI expects that
