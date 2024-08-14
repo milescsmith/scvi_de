@@ -322,7 +322,7 @@ def process_deg_results(
     df: pd.DataFrame,
     groupby: str,
     layer: str | None = None,
-    lfc_use: Literal["lfc_mean", "lfc_median", "lfc_std", "lfc_min", "lfc_max"] = "lfc_mean",
+    lfc_use="lfc_mean",
 ):
     """
     Reformat the dataframe(s) returned by `scvi.model.MODEL.differential_expression()` to a form matching
@@ -360,7 +360,7 @@ def process_deg_results(
     ).to_records(index=False)
 
     logfoldchanges_rec = pd.DataFrame(
-        {i: df[df["group1"] == i].loc[score_order[i], "proba_not_de"].to_list() for i in sorted(df["group1"].unique())}
+        {i: df[df["group1"] == i].loc[score_order[i], lfc_use].to_list() for i in sorted(df["group1"].unique())}
     ).to_records(index=False)
 
     return {

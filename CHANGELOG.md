@@ -1,6 +1,12 @@
+## [0.13.0] - 2024-08-14
+
+### Fixed
+- oh sweet christmas that was a stupid bug. replaced `"proba_not_de"` with `lfc_use` in `process_deg_results` when
+    creating the numpy.record for logfoldchanges
+
 ## [0.12.0] - 2024-08-14
 
-## Fixed
+### Fixed
 
 - fixed a bug in `process_deg_results` where scores, pvals, and pvals_adj were sorted by different means and so
     the records were not in the same order
@@ -172,3 +178,22 @@ Fixed the issue with raw counts being unusable in a layer instead of X because a
 ## [0.2.0](https://github.com/milescsmith/scvi_de/tree/0.2.0) - 2024-04-15
 
 - add return of scvi model option to scvi_de; add inplace argument ([#20240411](https://github.com/milescsmith/scvi_de/issues/20240411))
+
+
+[0.13.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.12.0..0.13.0
+[0.12.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.11.0..0.12.0
+[0.11.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.10.0..0.11.0
+[0.10.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.9.0..0.10.0
+[0.9.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.8.0..0.9.0
+[0.8.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.7.0..0.8.0
+[0.7.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.6.0..0.7.0
+[0.6.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.5.0..0.6.0
+[0.5.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.4.1..0.5.0
+[0.4.1]: https://github.com/{{username}}/{{module}}/releases/compare/0.4.0..0.4.1
+[0.4.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.3.4..0.4.0
+[0.3.4]: https://github.com/{{username}}/{{module}}/releases/compare/0.3.3..0.3.4
+[0.3.3]: https://github.com/{{username}}/{{module}}/releases/compare/0.3.2..0.3.3
+[0.3.2]: https://github.com/{{username}}/{{module}}/releases/compare/0.3.1..0.3.2
+[0.3.1]: https://github.com/{{username}}/{{module}}/releases/compare/0.3.0..0.3.1
+[0.3.0]: https://github.com/{{username}}/{{module}}/releases/compare/0.2.0..0.3.0
+[0.2.0]: https://github.com/{{username}}/{{module}}/releases/tag/v0.2.0
