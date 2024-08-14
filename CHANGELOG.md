@@ -1,3 +1,10 @@
+## [0.12.0] - 2024-08-14
+
+## Fixed
+
+- fixed a bug in `process_deg_results` where scores, pvals, and pvals_adj were sorted by different means and so
+    the records were not in the same order
+
 ## [0.11.0] - 2024-08-13
 
 ## Fixed

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scvi_de"
-version = "0.11.0"
+version = "0.12.0"
 description = "Default template for PDM package"
 authors = [
     {name = "Miles Smith", email = "miles-smith@omrf.org"},

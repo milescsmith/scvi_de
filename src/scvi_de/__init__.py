@@ -340,44 +340,27 @@ def process_deg_results(
     ------
     Same as that returned by `scanpy.tl.rank_genes_groups()`
     """
+
+    df["score"] = df.apply(lambda x: x["proba_de"] * x["lfc_mean"] * x["non_zeros_proportion1"], axis=1)
+    score_order = {
+        i: df.loc[lambda x: x["group1"] == i].sort_values("score", ascending=False).index  # noqa: B023 I don't know why ruff flags this line
+        for i in sorted(df["group1"].unique())
+    }
+
     names_rec = pd.DataFrame(
-        {
-            i: (
-                df[df["group1"] == i]["proba_de"]
-                * df[df["group1"] == i]["lfc_mean"]
-                * df[df["group1"] == i]["non_zeros_proportion1"]
-            )
-            .sort_values(ascending=False)
-            .index.to_list()
-            for i in sorted(df["group1"].unique())
-        }
+        {i: df[df["group1"] == i].loc[score_order[i], "score"].index.to_list() for i in sorted(df["group1"].unique())}
     ).to_records(index=False)
 
     scores_rec = pd.DataFrame(
-        {
-            i: (
-                df[df["group1"] == i]["proba_de"]
-                * df[df["group1"] == i]["lfc_mean"]
-                * df[df["group1"] == i]["non_zeros_proportion1"]
-            )
-            .sort_values(ascending=False)
-            .to_list()
-            for i in sorted(df["group1"].unique())
-        }
+        {i: df[df["group1"] == i].loc[score_order[i], "score"].to_list() for i in sorted(df["group1"].unique())}
     ).to_records(index=False)
 
     pvals_rec = pd.DataFrame(
-        {
-            i: df[df["group1"] == i]["proba_not_de"].sort_values(ascending=False).to_list()
-            for i in sorted(df["group1"].unique())
-        }
+        {i: df[df["group1"] == i].loc[score_order[i], "proba_not_de"].to_list() for i in sorted(df["group1"].unique())}
     ).to_records(index=False)
 
     logfoldchanges_rec = pd.DataFrame(
-        {
-            i: df[df["group1"] == i]["lfc_mean"].sort_values(ascending=False).to_list()
-            for i in sorted(df["group1"].unique())
-        }
+        {i: df[df["group1"] == i].loc[score_order[i], "proba_not_de"].to_list() for i in sorted(df["group1"].unique())}
     ).to_records(index=False)
 
     return {
