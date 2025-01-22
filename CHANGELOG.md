@@ -1,3 +1,8 @@
+## [0.14.0]  - 2025-01-22
+
+### Changed
+- Updated dependencies
+
 ## [0.13.0] - 2024-08-14
 
 ### Fixed
@@ -179,6 +184,8 @@ Fixed the issue with raw counts being unusable in a layer instead of X because a
 
 - add return of scvi model option to scvi_de; add inplace argument ([#20240411](https://github.com/milescsmith/scvi_de/issues/20240411))
 
+
+[0.14.0]: https://github.com/milescsmith/scvi_de/releases/compare/0.13.0..0.14.0
 [0.13.0]: https://github.com/milescsmith/scvi_de/releases/compare/0.12.0..0.13.0
 [0.12.0]: https://github.com/milescsmith/scvi_de/releases/compare/0.11.0..0.12.0
 [0.11.0]: https://github.com/milescsmith/scvi_de/releases/compare/0.10.0..0.11.0
